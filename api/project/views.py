@@ -6,42 +6,40 @@ import os
 def index(request):
     json_result = []
 
-    print(os.environ['POSTGRES_USER'])
+    conn = psycopg2.connect(
+        database=os.environ['POSTGRES_USER'], user=os.environ['POSTGRES_USER'],
+        password=os.environ['POSTGRES_USER'], host=os.environ['POSTGRES_HOST'], port='5432'
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT job.name,job.schedule," +
+                        "COALESCE(companies, '[]') AS companies," +
+                        "COALESCE(technologies, '[]') AS technologies," +
+                        "COALESCE(infos, '[]') AS infos" +
+                        "FROM job" +
+                        "LEFT JOIN LATERAL (" +
+                        "SELECT json_agg(json_build_object('logo', company.logo," +
+                        "'name', company.name)) AS companies" +
+                        "FROM company WHERE  company.job_id = job.id" +
+                        ")company ON true" +
+                        "LEFT JOIN LATERAL (" +
+                        "SELECT json_agg(json_build_object('skillname', technology.skillname)) AS technologies" +
+                        "FROM technology WHERE  technology.job_id = job.id" +
+                        ")technology ON true" +
+                        "LEFT JOIN LATERAL (" +
+                        "SELECT json_agg(json_build_object('infoname', info.infoname)) AS infos" +
+                        "FROM info WHERE  info.job_id = job.id" +
+                        ")info ON true" +
+                        "ORDER  BY job.id;")
+            print("The number of parts: ", cur.rowcount)
+            row = cur.fetchone()
 
-    #conn = psycopg2.connect(
-    #    database="datapizza", user='datapizza_user',
-    #    password='pwd', host='postgres', port='5432'
-    #)
-    #try:
-    #    with conn.cursor() as cur:
-    #        cur.execute("SELECT job.name,job.schedule," +
-    #                    "COALESCE(companies, '[]') AS companies," +
-    #                    "COALESCE(technologies, '[]') AS technologies," +
-    #                    "COALESCE(infos, '[]') AS infos" +
-    #                    "FROM job" +
-    #                    "LEFT JOIN LATERAL (" +
-    #                    "SELECT json_agg(json_build_object('logo', company.logo," +
-    #                    "'name', company.name)) AS companies" +
-    #                    "FROM company WHERE  company.job_id = job.id" +
-    #                    ")company ON true" +
-    #                    "LEFT JOIN LATERAL (" +
-    #                    "SELECT json_agg(json_build_object('skillname', technology.skillname)) AS technologies" +
-    #                    "FROM technology WHERE  technology.job_id = job.id" +
-    #                    ")technology ON true" +
-    #                    "LEFT JOIN LATERAL (" +
-    #                    "SELECT json_agg(json_build_object('infoname', info.infoname)) AS infos" +
-    #                    "FROM info WHERE  info.job_id = job.id" +
-    #                    ")info ON true" +
-    #                    "ORDER  BY job.id;")
-    #        print("The number of parts: ", cur.rowcount)
-    #        row = cur.fetchone()
-
-    #        while row is not None:
-    #            print(row)
-    #            row = cur.fetchone()
-    #            json_result.append(row)
-    #except (Exception, psycopg2.DatabaseError) as error:
-    #    print(error)
+            while row is not None:
+                print(row)
+                row = cur.fetchone()
+                json_result.append(row)
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
 
     return JsonResponse(json_result, safe=False)
 
